@@ -69,11 +69,7 @@ def _test_script(spec_name: str, step: int) -> str:
 
 
 def _solution_script() -> str:
-    return (
-        "#!/bin/bash\n"
-        "set -euo pipefail\n"
-        "python3 /skills/aiq-research/scripts/aiq.py health\n"
-    )
+    return "#!/bin/bash\nset -euo pipefail\npython3 /skills/aiq-research/scripts/aiq.py health\n"
 
 
 def _environment_compose() -> str:
@@ -115,8 +111,8 @@ def _task_toml(skill: str, spec_stem: str, platform: str, mode: str, step: int, 
             f'spec = "{spec_stem}"',
             f'platform = "{platform}"',
             f'mode = "{mode}"',
-            f'step = {step}',
-            f'total_steps = {total_steps}',
+            f"step = {step}",
+            f"total_steps = {total_steps}",
             "",
         ]
     )
