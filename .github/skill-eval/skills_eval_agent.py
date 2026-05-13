@@ -88,9 +88,14 @@ def _task_roots(dataset_root: Path) -> list[Path]:
 
 
 def _run_harbor(task_root: Path) -> int:
-    model = os.environ.get("ANTHROPIC_MODEL")
-    if not model:
-        print("BLOCKED: ANTHROPIC_MODEL is required for Harbor execution", file=sys.stderr)
+    agent = os.environ.get("AIQ_SKILL_EVAL_AGENT", "claude-code")
+    model = os.environ.get("AIQ_SKILL_EVAL_MODEL") or os.environ.get("ANTHROPIC_MODEL")
+    max_retries = os.environ.get("AIQ_SKILL_EVAL_MAX_RETRIES", "1")
+    if agent != "oracle" and not model:
+        print(
+            "BLOCKED: AIQ_SKILL_EVAL_MODEL or ANTHROPIC_MODEL is required for Harbor execution",
+            file=sys.stderr,
+        )
         return 2
 
     cmd = [
@@ -100,23 +105,24 @@ def _run_harbor(task_root: Path) -> int:
         "-p",
         str(task_root),
         "-a",
-        "claude-code",
-        "--model",
-        model,
-        "--ae",
-        "CLAUDE_CODE_DISABLE_THINKING=1",
+        agent,
         "--max-retries",
-        "0",
+        max_retries,
         "-n",
         "1",
         "--yes",
         "-o",
         os.environ.get("AIQ_SKILL_EVAL_RESULTS_DIR", "/tmp/aiq-skill-eval/results"),
     ]
-    base_url = os.environ.get("ANTHROPIC_BASE_URL")
-    if base_url:
-        cmd.extend(["--ak", f"api_base={base_url.rstrip('/')}/v1"])
-
+    if model:
+        cmd.extend(["--model", model])
+    if agent == "claude-code":
+        cmd.extend(["--ae", "CLAUDE_CODE_DISABLE_THINKING=1"])
+    if agent == "codex":
+        for key in ("CODEX_FORCE_AUTH_JSON", "CODEX_AUTH_JSON_PATH"):
+            value = os.environ.get(key)
+            if value:
+                cmd.extend(["--ae", f"{key}={value}"])
     result = _run(cmd)
     print(result.stdout)
     return result.returncode

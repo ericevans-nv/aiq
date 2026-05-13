@@ -16,6 +16,20 @@ on:
         required: false
         default: false
         type: boolean
+      agent:
+        description: "Harbor agent to run"
+        required: false
+        default: "claude-code"
+        type: choice
+        options:
+          - claude-code
+          - codex
+          - oracle
+      model:
+        description: "Model name for the selected Harbor agent"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -66,9 +80,11 @@ jobs:
       - name: Run Harbor trials
         env:
           AIQ_SERVER_URL: ${{ secrets.AIQ_SKILL_EVAL_SERVER_URL }}
+          AIQ_SKILL_EVAL_AGENT: ${{ inputs.agent }}
+          AIQ_SKILL_EVAL_MODEL: ${{ inputs.model || vars.AIQ_SKILL_EVAL_MODEL || vars.ANTHROPIC_MODEL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
-          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CLAUDE_CODE_DISABLE_THINKING: "1"
         run: |
           python3 .github/skill-eval/skills_eval_agent.py --all --run-harbor \

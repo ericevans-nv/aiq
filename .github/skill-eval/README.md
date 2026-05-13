@@ -74,15 +74,29 @@ Harbor execution requires a runner where:
 
 - `AIQ_SERVER_URL` points to a running AI-Q server.
 - `uvx harbor` is available.
-- Claude Code / Anthropic-compatible credentials are available through `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and `ANTHROPIC_MODEL`.
+- Agent credentials are available for the selected Harbor agent.
+- `AIQ_SKILL_EVAL_MAX_RETRIES` can tune Harbor retries and defaults to `1` to tolerate transient agent install failures.
 
-Example:
+Claude Code is the default agent and uses Anthropic-compatible credentials:
 
 ```bash
-export AIQ_SERVER_URL=http://localhost:8000
-export ANTHROPIC_MODEL=...
+export AIQ_SERVER_URL=http://host.docker.internal:8000
 export ANTHROPIC_BASE_URL=...
 export ANTHROPIC_API_KEY=...
+export ANTHROPIC_MODEL=...
+
+python3 .github/skill-eval/skills_eval_agent.py --all --run-harbor
+```
+
+For local Docker Desktop runs, `host.docker.internal` lets the Harbor task container reach an AI-Q server running on the host. If AI-Q is running inside the same network as Harbor, use that reachable URL instead.
+
+Codex is also supported. To use the local Codex login without printing or copying tokens into commands, opt into Harbor's `auth.json` upload path:
+
+```bash
+export AIQ_SERVER_URL=http://host.docker.internal:8000
+export AIQ_SKILL_EVAL_AGENT=codex
+export AIQ_SKILL_EVAL_MODEL=gpt-5.2
+export CODEX_FORCE_AUTH_JSON=1
 
 python3 .github/skill-eval/skills_eval_agent.py --all --run-harbor
 ```

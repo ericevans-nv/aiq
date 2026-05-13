@@ -26,7 +26,7 @@
 # =============================================================================
 # Stage 1: Builder (shared between dev and release)
 # =============================================================================
-FROM nvcr.io/nvidia/base/ubuntu:jammy-20251013 AS builder
+FROM nvcr.io/nvidia/base/ubuntu:noble-20251013 AS builder
 
 WORKDIR /app
 
@@ -34,19 +34,16 @@ WORKDIR /app
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     tzdata \
     build-essential \
+    ca-certificates \
     curl \
     git \
-    software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3.12 \
     python3.12-dev \
+    python3-pip \
     python3.12-venv \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3.12 -m ensurepip --upgrade \
-    && python3.12 -m pip install --no-cache-dir uv \
+RUN python3.12 -m pip install --break-system-packages --no-cache-dir uv \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python3
 
