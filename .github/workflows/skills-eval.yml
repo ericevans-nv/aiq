@@ -1,0 +1,84 @@
+name: Skills Eval
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - "release/**"
+    paths:
+      - ".agents/skills/**"
+      - ".github/skill-eval/**"
+      - ".github/workflows/skills-eval.yml"
+  workflow_dispatch:
+    inputs:
+      run_harbor:
+        description: "Run Harbor trials on the self-hosted AI-Q eval runner"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aiq-skills-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-datasets:
+    name: Validate Skill Eval Datasets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Generate datasets
+        run: |
+          python3 .github/skill-eval/skills_eval_agent.py --all \
+            --output-dir /tmp/aiq-skill-eval/datasets
+
+      - name: Upload generated datasets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiq-skill-eval-datasets-${{ github.run_id }}
+          path: /tmp/aiq-skill-eval/datasets
+          if-no-files-found: error
+          retention-days: 7
+
+  harbor-eval:
+    name: Run Harbor Skill Eval
+    if: github.event_name == 'workflow_dispatch' && inputs.run_harbor
+    runs-on: [self-hosted, aiq-eval]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Harbor trials
+        env:
+          AIQ_SERVER_URL: ${{ secrets.AIQ_SKILL_EVAL_SERVER_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          CLAUDE_CODE_DISABLE_THINKING: "1"
+        run: |
+          python3 .github/skill-eval/skills_eval_agent.py --all --run-harbor \
+            --output-dir /tmp/aiq-skill-eval/datasets
+
+      - name: Upload Harbor results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiq-skill-eval-results-${{ github.run_id }}
+          path: /tmp/aiq-skill-eval/results
+          if-no-files-found: ignore
+          retention-days: 7

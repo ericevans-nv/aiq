@@ -5,27 +5,32 @@ SPDX-License-Identifier: Apache-2.0
 
 # Agent Skills for Coding Harnesses
 
-AI-Q includes a portable Agent Skill for coding harnesses that support skill-style instructions and helper scripts. The skill lets an assistant call a locally running AI-Q Blueprint server for routed `/chat` requests and async deep research job lifecycle operations.
+AI-Q includes portable Agent Skills for coding harnesses that support skill-style instructions and helper scripts.
 
-The packaged skill lives at:
+- `aiq-deploy` helps an assistant deploy, verify, troubleshoot, rebuild, and stop the AI-Q Blueprint in CLI, local web, Docker Compose, or Kubernetes mode.
+- `aiq-research` lets an assistant call a locally running AI-Q Blueprint server for routed `/chat` requests and async deep research job lifecycle operations.
+
+The packaged skills live at:
 
 ```text
+.agents/skills/aiq-deploy/
 .agents/skills/aiq-research/
 ```
 
-The installed `aiq-research` directory must contain `SKILL.md` at its root. For package-local details, see `.agents/skills/aiq-research/README.md`.
+Each installed skill directory must contain `SKILL.md` at its root. For package-local details, see `.agents/skills/<skill-name>/README.md`.
 
 ## Prerequisites
 
 - Python 3.10 or newer.
-- A local AI-Q Blueprint server, usually at `http://localhost:8000`.
-- Set `AIQ_SERVER_URL` only when using a different local server URL.
+- For `aiq-deploy`: access to this repository and the selected runtime, such as Docker Compose, Node/npm for local web mode, or kubectl/Helm for Kubernetes mode.
+- For `aiq-research`: a local AI-Q Blueprint server, usually at `http://localhost:8000`. Set `AIQ_SERVER_URL` only when using a different local server URL.
 
 ## Claude Code
 
-Claude Code supports repo-local skills under `.claude/skills/`. This repository keeps that path as a compatibility symlink:
+Claude Code supports repo-local skills under `.claude/skills/`. This repository keeps those paths as compatibility symlinks:
 
 ```text
+.claude/skills/aiq-deploy -> ../../.agents/skills/aiq-deploy
 .claude/skills/aiq-research -> ../../.agents/skills/aiq-research
 ```
 
@@ -33,6 +38,7 @@ To recreate the repo-local install manually:
 
 ```bash
 mkdir -p .claude/skills
+ln -s ../../.agents/skills/aiq-deploy .claude/skills/aiq-deploy
 ln -s ../../.agents/skills/aiq-research .claude/skills/aiq-research
 ```
 
@@ -40,6 +46,7 @@ For a user-level install:
 
 ```bash
 mkdir -p ~/.claude/skills
+cp -R .agents/skills/aiq-deploy ~/.claude/skills/aiq-deploy
 cp -R .agents/skills/aiq-research ~/.claude/skills/aiq-research
 ```
 
@@ -50,6 +57,7 @@ For Codex or another Agent Skills-compatible tool, install the skill into the ru
 Generic install shape:
 
 ```text
+<codex-skills-dir>/aiq-deploy/SKILL.md
 <codex-skills-dir>/aiq-research/SKILL.md
 <codex-skills-dir>/aiq-research/scripts/aiq.py
 ```
@@ -58,6 +66,7 @@ Example:
 
 ```bash
 mkdir -p <codex-skills-dir>
+cp -R .agents/skills/aiq-deploy <codex-skills-dir>/aiq-deploy
 cp -R .agents/skills/aiq-research <codex-skills-dir>/aiq-research
 ```
 
@@ -72,6 +81,7 @@ Install with:
 
 ```bash
 mkdir -p ~/.config/opencode/skills
+cp -R .agents/skills/aiq-deploy ~/.config/opencode/skills/aiq-deploy
 cp -R .agents/skills/aiq-research ~/.config/opencode/skills/aiq-research
 ```
 
@@ -80,10 +90,11 @@ Restart OpenCode or start a new session after installation.
 
 ## Verify Installation
 
-From the installed skill directory, run:
+From the parent directory containing the installed skills, run:
 
 ```bash
-python3 scripts/aiq.py
+test -f aiq-deploy/SKILL.md
+python3 aiq-research/scripts/aiq.py
 ```
 
 Expected output starts with:
