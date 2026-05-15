@@ -21,9 +21,63 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = Path(os.environ.get("AIQ_SKILL_EVAL_OUTPUT_DIR", "/tmp/aiq-skill-eval/datasets"))
 REQUIRED_SPEC_KEYS = ("skills", "resources", "env", "expects")
 
+# Argv elements whose key portion ends in any of these suffixes are redacted in
+# printed commands so credentials passed via `harbor --ae KEY=VALUE` (and similar
+# inline KEY=VALUE forms) do not leak into stdout or captured workflow logs.
+# The real values are still passed to subprocess.run unchanged.
+_SECRET_KEY_SUFFIXES = ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD")
+
+
+def _is_secret_key(name: str) -> bool:
+    upper = name.upper()
+    return any(upper.endswith(suffix) for suffix in _SECRET_KEY_SUFFIXES)
+
+
+_SUFFIX_REVEAL_CHARS = 4
+_SUFFIX_REVEAL_MIN_VALUE_LEN = 9
+
+
+def _mask_value(value: str) -> str:
+    """Mask a secret value, optionally revealing a short suffix for identification.
+
+    Short values are fully masked (`***`); longer values keep the last few
+    characters to help operators confirm which key was loaded without
+    exposing meaningful entropy. The reveal length and minimum value
+    length are constants so they can be tuned in one place.
+    """
+    if len(value) < _SUFFIX_REVEAL_MIN_VALUE_LEN:
+        return "***"
+    return f"***{value[-_SUFFIX_REVEAL_CHARS:]}"
+
+
+def _mask_kv(arg: str) -> str:
+    """Return KEY=***xxxx if KEY looks secret-shaped, else `arg` unchanged."""
+    if "=" not in arg:
+        return arg
+    key, value = arg.split("=", 1)
+    return f"{key}={_mask_value(value)}" if _is_secret_key(key) else arg
+
+
+def _redact_for_log(cmd: list[str]) -> list[str]:
+    """Return a copy of `cmd` with secret-shaped values masked for safe printing."""
+    redacted: list[str] = []
+    iterator = iter(cmd)
+    for arg in iterator:
+        if arg == "--ae":
+            # The next argv element is the KEY=VALUE pair; mask its value if secret-shaped.
+            redacted.append(arg)
+            nxt = next(iterator, None)
+            if nxt is not None:
+                redacted.append(_mask_kv(nxt))
+            continue
+        # Inline KEY=VALUE arguments (e.g. exported through `KEY=VAL command` patterns
+        # that leak into argv) are also masked defensively.
+        redacted.append(_mask_kv(arg))
+    return redacted
+
 
 def _run(cmd: list[str], *, cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[str]:
-    print("+ " + " ".join(cmd), flush=True)
+    print("+ " + " ".join(_redact_for_log(cmd)), flush=True)
     return subprocess.run(cmd, cwd=cwd, text=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
@@ -118,8 +172,12 @@ def _run_harbor(task_root: Path) -> int:
         cmd.extend(["--model", model])
     if agent == "claude-code":
         cmd.extend(["--ae", "CLAUDE_CODE_DISABLE_THINKING=1"])
+        for key in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"):
+            value = os.environ.get(key)
+            if value:
+                cmd.extend(["--ae", f"{key}={value}"])
     if agent == "codex":
-        for key in ("CODEX_FORCE_AUTH_JSON", "CODEX_AUTH_JSON_PATH"):
+        for key in ("OPENAI_API_KEY", "CODEX_FORCE_AUTH_JSON", "CODEX_AUTH_JSON_PATH"):
             value = os.environ.get(key)
             if value:
                 cmd.extend(["--ae", f"{key}={value}"])

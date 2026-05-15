@@ -76,6 +76,8 @@ def _environment_compose() -> str:
     return (
         "services:\n"
         "  main:\n"
+        "    extra_hosts:\n"
+        '      - "host.docker.internal:host-gateway"\n'
         "    environment:\n"
         "      AIQ_SERVER_URL: ${AIQ_SERVER_URL}\n"
         "    volumes:\n"
