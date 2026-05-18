@@ -131,6 +131,13 @@ jobs:
           echo "Loaded credential keys (names only):"
           grep -oE '^[A-Z_][A-Z0-9_]*=' "$RUNNER_ENV_FILE" | sed 's/=$//' | sort
 
+      - name: Materialize deploy/.env from runner credentials
+        run: |
+          # docker-compose.yaml has `env_file: [../.env]` paths that resolve to
+          # aiq/deploy/.env. That file is gitignored. Copy the runner's
+          # canonical .env into place for the duration of this job.
+          install -m 0600 "$RUNNER_ENV_FILE" deploy/.env
+
       - name: Bring up AI-Q stack from PR HEAD
         working-directory: deploy/compose
         run: |
@@ -141,7 +148,7 @@ jobs:
           # Mirror local recipe: build from source, tag with run id so
           # concurrent runs (if any) don't collide.
           export BACKEND_IMAGE="aiq-agent:ci-${{ github.run_id }}"
-          docker compose --env-file "$RUNNER_ENV_FILE" -f docker-compose.yaml up -d --build aiq-agent postgres
+          docker compose --env-file ../.env -f docker-compose.yaml up -d --build aiq-agent postgres
 
       - name: Wait for AI-Q /health
         run: |
@@ -156,8 +163,8 @@ jobs:
             sleep 5
           done
           echo "::error::AI-Q did not report healthy within 5 minutes"
-          docker compose --env-file "$RUNNER_ENV_FILE" -f deploy/compose/docker-compose.yaml ps || true
-          docker compose --env-file "$RUNNER_ENV_FILE" -f deploy/compose/docker-compose.yaml logs --tail 200 aiq-agent || true
+          docker compose --env-file deploy/.env -f deploy/compose/docker-compose.yaml ps || true
+          docker compose --env-file deploy/.env -f deploy/compose/docker-compose.yaml logs --tail 200 aiq-agent || true
           exit 1
 
       - name: Run Harbor trials
@@ -199,8 +206,16 @@ jobs:
           # Postgres doesn't leak state between runs, prune dangling images
           # so we don't fill the runner disk. Keep the image cache for the
           # `aiq-agent` build layers (next run is faster).
-          docker compose --env-file "$RUNNER_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans || true
+          docker compose --env-file ../.env -f docker-compose.yaml down -v --remove-orphans || true
           docker image prune -f || true
+
+      - name: Remove materialized deploy/.env
+        if: always()
+        run: |
+          # The runner is long-lived; don't leave the copied .env on disk
+          # between job runs even though the source file at $RUNNER_ENV_FILE
+          # is the canonical home.
+          rm -f deploy/.env || true
 
       - name: Clean ephemeral image
         if: always()
