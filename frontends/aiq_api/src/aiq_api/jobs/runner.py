@@ -247,6 +247,7 @@ async def run_agent_job(
     available_documents: list[dict] | None = None,
     data_sources: list[str] | None = None,
     auth_token: str | None = None,
+    owner_user_id: str | None = None,
 ):
     """
     Dask task to run any registered agent with cancellation support and telemetry.
@@ -278,6 +279,9 @@ async def run_agent_job(
         data_sources: Optional list of allowed data sources to enforce in the worker.
         auth_token: Optional auth token propagated from the HTTP request for
             data sources that require authentication (requires_auth: true).
+        owner_user_id: Canonical per-user key (``principal_user_id``) for the job
+            owner. Set on the NAT Context so per_user_mcp_client retrieves the
+            token the owner connected via /v1/auth/mcp/{id}/connect.
     """
 
     # Propagate auth token into the current async task's context so tools
@@ -342,6 +346,14 @@ async def run_agent_job(
             fn_config = builder.get_function_config(agent_config_name)
 
             provider, llm = await _create_llm_provider(builder, fn_config)
+
+            # Bind the job owner's identity on the NAT context before tools are
+            # built or run, so a per_user_mcp_client resolves the token this user
+            # connected via /v1/auth/mcp/{id}/connect (keyed by principal_user_id).
+            if owner_user_id:
+                from nat.builder.context import ContextState
+
+                ContextState.get().user_id.set(owner_user_id)
 
             # Resolve tools: use explicit list or auto-inherit from data_source_registry
             tool_refs = fn_config.tools
@@ -464,27 +476,44 @@ async def run_agent_job(
                     callbacks.append(AgentEventCallback(event_store))
                     callbacks.append(nat_profiler_callback)
 
-                    # Instantiate agent with callbacks
-                    agent = _create_agent_instance(
-                        agent_cls=agent_cls,
-                        llm_provider=provider,
-                        llm=llm,
-                        tools=tools,
-                        fn_config=fn_config,
-                        verbose=verbose,
-                        callbacks=callbacks,
-                        job_id=job_id,
-                    )
+                    # Resolve per-user MCP source tools for the job owner (Context.user_id
+                    # was set above). Their MCP client connections are kept open via
+                    # mcp_stack for the duration of the agent run. Best-effort: the helper
+                    # never raises for a source it can't resolve, so this can't break a job.
+                    from contextlib import AsyncExitStack
 
-                    # Run agent - LLM/tool events will be nested under workflow span
-                    result = await _run_agent(
-                        agent=agent,
-                        input_text=input_text,
-                        monitor=cancellation_monitor,
-                        available_documents=available_documents,
-                        data_sources=data_sources,
-                        event_store=event_store,
-                    )
+                    from ..mcp_auth.runtime_tools import open_per_user_mcp_tools
+
+                    async with AsyncExitStack() as mcp_stack:
+                        mcp_tools = await open_per_user_mcp_tools(
+                            builder=builder,
+                            data_sources=data_sources,
+                            exit_stack=mcp_stack,
+                            wrapper_type=LLMFrameworkEnum.LANGCHAIN,
+                        )
+                        agent_tools = [*tools, *mcp_tools] if mcp_tools else tools
+
+                        # Instantiate agent with callbacks
+                        agent = _create_agent_instance(
+                            agent_cls=agent_cls,
+                            llm_provider=provider,
+                            llm=llm,
+                            tools=agent_tools,
+                            fn_config=fn_config,
+                            verbose=verbose,
+                            callbacks=callbacks,
+                            job_id=job_id,
+                        )
+
+                        # Run agent - LLM/tool events will be nested under workflow span
+                        result = await _run_agent(
+                            agent=agent,
+                            input_text=input_text,
+                            monitor=cancellation_monitor,
+                            available_documents=available_documents,
+                            data_sources=data_sources,
+                            event_store=event_store,
+                        )
 
                     # Emit WORKFLOW_END event for Phoenix
                     context.intermediate_step_manager.push_intermediate_step(
