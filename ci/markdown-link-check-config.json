@@ -10,10 +10,10 @@
             "pattern": "^https?://www\\.npmjs\\.com/package/@nvidia/foundations-react-core$"
         },
         {
-            "pattern": "^https?://fastapi\\.tiangolo\\.com"
+            "pattern": "^https://fastapi\\.tiangolo\\.com/$"
         },
         {
-            "pattern": "^https?://(www\\.)?dask\\.org"
+            "pattern": "^https://www\\.dask\\.org/$"
         }
     ],
     "replacementPatterns": [

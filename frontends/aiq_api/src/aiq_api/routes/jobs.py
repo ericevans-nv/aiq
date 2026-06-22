@@ -43,6 +43,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import field_validator
 
 from aiq_agent.common.data_source_registry import get_all_sources
 from aiq_agent.common.data_source_registry import get_all_tool_refs
@@ -86,6 +87,14 @@ class JobSubmitRequest(BaseModel):
             "data-source tools; unmapped utility tools remain available."
         ),
     )
+
+    @field_validator("input")
+    @classmethod
+    def _input_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Input must not be blank")
+        return stripped
 
 
 JOB_SUBMIT_EXAMPLES: dict[str, dict] = {
@@ -295,6 +304,17 @@ class ReportEditRequest(BaseModel):
         le=604800,
         description="Child job expiry in seconds (default from config, max 7 days)",
     )
+
+    @field_validator("input")
+    @classmethod
+    def _input_not_blank(cls, value: str) -> str:
+        # min_length=1 still allows whitespace-only; the report rewriter requires a
+        # real instruction, so reject blank input at the boundary instead of
+        # creating a guaranteed-failing child job.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Edit instruction must not be blank")
+        return stripped
 
 
 class ReportEditResponse(BaseModel):
@@ -515,7 +535,11 @@ async def register_job_routes(app: FastAPI, builder: WorkflowBuilder, worker: Fa
         except JobIdConflictError:
             raise HTTPException(409, f"Job already exists: {req.job_id}")
         except RuntimeError as e:
-            raise HTTPException(403, str(e))
+            # The principal is resolved above, so a RuntimeError here is an
+            # availability/config failure (e.g. scheduler not configured), not an
+            # authorization error -- surface 503, not 403, and don't echo internals.
+            logger.warning("Async job submission unavailable: %s", e)
+            raise HTTPException(503, "Async job submission is currently unavailable")
         except Exception as e:
             logger.warning("Failed to submit authorized job: %s", e)
             raise HTTPException(500, "Failed to persist async job authorization metadata")
@@ -579,7 +603,10 @@ async def register_job_routes(app: FastAPI, builder: WorkflowBuilder, worker: Fa
         except JobIdConflictError:
             raise HTTPException(409, f"Job already exists: {req.job_id}")
         except RuntimeError as e:
-            raise HTTPException(403, str(e))
+            # Principal is resolved above; a RuntimeError here is an availability/config
+            # failure (e.g. scheduler not configured), not an authorization error.
+            logger.warning("Report edit submission unavailable for parent %s: %s", job_id, e)
+            raise HTTPException(503, "Report edit submission is currently unavailable")
         except Exception as e:
             logger.warning("Failed to submit report edit job for parent %s: %s", job_id, e)
             raise HTTPException(500, "Failed to submit report edit job")
