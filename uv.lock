@@ -265,11 +265,11 @@ requires-dist = [
     { name = "langgraph-checkpoint-sqlite", specifier = ">=2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=3.0" },
-    { name = "nvidia-nat", extras = ["langchain", "async-endpoints", "phoenix", "mcp"], specifier = "==1.8.0rc4" },
-    { name = "nvidia-nat-core", specifier = "==1.8.0rc4" },
-    { name = "nvidia-nat-eval", specifier = "==1.8.0rc4" },
-    { name = "nvidia-nat-profiler", specifier = "==1.8.0rc4" },
-    { name = "nvidia-nat-redis", specifier = "==1.8.0rc4" },
+    { name = "nvidia-nat", extras = ["langchain", "async-endpoints", "phoenix", "mcp"], specifier = "==1.8.0" },
+    { name = "nvidia-nat-core", specifier = "==1.8.0" },
+    { name = "nvidia-nat-eval", specifier = "==1.8.0" },
+    { name = "nvidia-nat-profiler", specifier = "==1.8.0" },
+    { name = "nvidia-nat-redis", specifier = "==1.8.0" },
     { name = "nvidia-sphinx-theme", marker = "extra == 'docs'", specifier = ">=0.0.9.post1" },
     { name = "pillow", specifier = ">=12.2.0,<13" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
@@ -1340,7 +1340,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.24.0" },
-    { name = "nvidia-nat-eval", specifier = "==1.8.0rc4" },
+    { name = "nvidia-nat-eval", specifier = "==1.8.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
 ]
 
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "nvidia-nat-eval", specifier = "==1.8.0rc4" },
+    { name = "nvidia-nat-eval", specifier = "==1.8.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytz", specifier = ">=2024.1" },
 ]
@@ -3697,13 +3697,13 @@ wheels = [
 
 [[package]]
 name = "nvidia-nat"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nvidia-nat-core" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/54/3ed15fbf00dc250c721c65b5242707a2a67b473873d7e5ce2f141999d609/nvidia_nat-1.8.0rc4-py3-none-any.whl", hash = "sha256:f860a0d95f99b8ac6ad97730baa9183b24a3b3b054b99ac1c7ccb83402b0d3b3", size = 49664, upload-time = "2026-06-11T00:26:19.201Z" },
+    { url = "https://files.pythonhosted.org/packages/87/e3/3988449b8aca0031a461b891f2b4fbdccc062fa7c39fc9867fbc86c3193a/nvidia_nat-1.8.0-py3-none-any.whl", hash = "sha256:3df0f5f69df0c1a713eeef292d476b54b8fd108c438416b903569e6e91076dc2", size = 49614, upload-time = "2026-06-17T00:25:55.043Z" },
 ]
 
 [package.optional-dependencies]
@@ -3722,18 +3722,18 @@ phoenix = [
 
 [[package]]
 name = "nvidia-nat-atif"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/12/ba8c5bac2d07fc57e77df4783ae54e8889947394636ade1605315098ad2e/nvidia_nat_atif-1.8.0rc4-py3-none-any.whl", hash = "sha256:e4d5463ec2b51aa62cbd01b72aaa27bd6dd80b8de65a109b1093c4821d53f7fd", size = 105678, upload-time = "2026-06-11T00:25:38.599Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/ee/a22d1b5d5d6f3d625f451f5185b7e32a6464058f2c7899f6d98c68f46aef/nvidia_nat_atif-1.8.0-py3-none-any.whl", hash = "sha256:38c97d6e506e8cc151a997bfd6cafa08b969e181b50b9302f28d2229a3b37829", size = 105633, upload-time = "2026-06-17T00:25:16.624Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-core"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -3769,7 +3769,7 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/2f/5c033c07a27832a231de0b0ecea4b695b2f74250772895d91ff00ec08b7b/nvidia_nat_core-1.8.0rc4-py3-none-any.whl", hash = "sha256:1fc71d61a6cedf73c821922772489c8ced0bd6036c6729715d2503d4748e23f0", size = 778907, upload-time = "2026-06-11T00:21:35.356Z" },
+    { url = "https://files.pythonhosted.org/packages/10/17/46f8bb24ba9789064ab6a90a905f31218bca802346adace079256db82c72/nvidia_nat_core-1.8.0-py3-none-any.whl", hash = "sha256:645bcc995f73598016b750f7849decb24bea857549f96f5fcbbd8ff37f0c3fc5", size = 779726, upload-time = "2026-06-17T00:21:24.556Z" },
 ]
 
 [package.optional-dependencies]
@@ -3782,18 +3782,18 @@ async-endpoints = [
 
 [[package]]
 name = "nvidia-nat-eval"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nvidia-nat-atif" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/6d/48af9d245b41df9c000ab9d460d8676844912c4fe69d76e3ebfe3080b4dd/nvidia_nat_eval-1.8.0rc4-py3-none-any.whl", hash = "sha256:4f2bf2b177c9a0fa1ad0156cb1641a4a8680913f23d96b100019b9513900d63e", size = 69686, upload-time = "2026-06-11T00:23:38.772Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/25/0fd8109c653d967d82f8ef6fc729c41504e3b4ec51dcfd39c952275d4e67/nvidia_nat_eval-1.8.0-py3-none-any.whl", hash = "sha256:4baebf66289040708c22bfd57f6edb37728409795a260bd0f07b894c9ec8b110", size = 69649, upload-time = "2026-06-17T00:23:20.109Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-langchain"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain" },
@@ -3818,12 +3818,12 @@ dependencies = [
     { name = "wikipedia" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/72/b27daed38c76996f072eb8981ef305e989d4477d89fd41fd4b89ac0745bd/nvidia_nat_langchain-1.8.0rc4-py3-none-any.whl", hash = "sha256:f826970d7d16458cc9f159f2efe6562b891d6571646aab553c3780ea09b8e6d6", size = 197448, upload-time = "2026-06-11T00:27:45.343Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/49/eee7d8f68568e4c994a67ee0def4070e8fdeb0d603a7ef580050b3ee3d34/nvidia_nat_langchain-1.8.0-py3-none-any.whl", hash = "sha256:8120ad2b972ce2d90fae1e7f95b3daf6b463310e0105fc330896bfb069a5d403", size = 197395, upload-time = "2026-06-17T00:27:13.69Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-mcp"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiorwlock" },
@@ -3831,12 +3831,12 @@ dependencies = [
     { name = "nvidia-nat-core" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/b5/7b6acedade3da0e1de45ec54d15c5d60f259d00287629adf025633d778c5/nvidia_nat_mcp-1.8.0rc4-py3-none-any.whl", hash = "sha256:4d73b87c6c75a91e215d05f739982fc01f9744b6bb961e14a71089d3926d1a12", size = 132688, upload-time = "2026-06-11T00:22:37.953Z" },
+    { url = "https://files.pythonhosted.org/packages/08/c5/1cf428635978b8a705d7c35e816ee91278414d1607e91f211e6aa2de6507/nvidia_nat_mcp-1.8.0-py3-none-any.whl", hash = "sha256:b38983d9d94f5f47ead7acc395c86409d19533f0bf0643489bbde01f35603f71", size = 132635, upload-time = "2026-06-17T00:22:22.383Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-opentelemetry"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nvidia-nat-core" },
@@ -3846,12 +3846,12 @@ dependencies = [
     { name = "opentelemetry-sdk" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/ae/d89a7dcad2ee96e41a8173f4f434d17c7e18d164152ca62902c0f45dcad7/nvidia_nat_opentelemetry-1.8.0rc4-py3-none-any.whl", hash = "sha256:56e4576417f1d6224aea136b0de9bedefe9cf139101e02efc12768abc768b090", size = 68498, upload-time = "2026-06-11T00:39:23.932Z" },
+    { url = "https://files.pythonhosted.org/packages/df/df/33cba1fb316f720b075dac2330b588b1a62d9d991cd6e1d5bc8f795b3bba/nvidia_nat_opentelemetry-1.8.0-py3-none-any.whl", hash = "sha256:2ef2de28a1d07029126ae1c13ff39b9dd61a6985e43199e6fe80968b465b1eec", size = 68449, upload-time = "2026-06-17T00:39:23.758Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-phoenix"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "arize-phoenix-otel" },
@@ -3860,12 +3860,12 @@ dependencies = [
     { name = "openinference-instrumentation" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/50/f655f6c348a2890bd82195e4d8e0d5eaf00621a40193d958ad0e046bf18b/nvidia_nat_phoenix-1.8.0rc4-py3-none-any.whl", hash = "sha256:dd8bf2f579e47126ca9e57a313dbaa528c9ef099058f63a786ba96ea77aa4ffc", size = 67014, upload-time = "2026-06-11T00:27:23.785Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/7a/63b4c79db1f889d5353d23cc68f1a06644cb370a421e723f84bfd57678d3/nvidia_nat_phoenix-1.8.0-py3-none-any.whl", hash = "sha256:e0e623548f02560c9a0984b3b391ce0474d7cbb3f4a5d796b2ac43abe4e4b928", size = 66960, upload-time = "2026-06-17T00:26:53.586Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-profiler"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -3876,19 +3876,19 @@ dependencies = [
     { name = "tqdm" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/c0/f762326fa456d8ddd043cadd62474936fcbbfa104f3f6b2d5ef0a2ed7b3b/nvidia_nat_profiler-1.8.0rc4-py3-none-any.whl", hash = "sha256:e421efdfb59405aa92e3b1f9c327a65735fa5b47d3e0214cf8d190213890175d", size = 108194, upload-time = "2026-06-11T00:24:59.086Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/b4/b7f5ce2e3ddee8518cf2314a7cf1f69f46da0e056d253d8d4bcb4952ba57/nvidia_nat_profiler-1.8.0-py3-none-any.whl", hash = "sha256:32ef0c7e83cdc72029b97b3899497dec6864ac3db9378a3842565bbe269f0dce", size = 108154, upload-time = "2026-06-17T00:24:38.546Z" },
 ]
 
 [[package]]
 name = "nvidia-nat-redis"
-version = "1.8.0rc4"
+version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nvidia-nat-core" },
     { name = "redis" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/2f/5e5ef9fc0a103826a25fcf1cca796baca788ec2c1322ca0fbba1e0a66239/nvidia_nat_redis-1.8.0rc4-py3-none-any.whl", hash = "sha256:465cd9815f43d9d7dbded1f1f4ed4eabf4d321cdd2b5a3fb6573735f2ff8321f", size = 58949, upload-time = "2026-06-11T00:40:22.738Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/c5/ad7e01178a8c68eaed57bee3cc686c31f9a87d27f42193622831e4722e16/nvidia_nat_redis-1.8.0-py3-none-any.whl", hash = "sha256:e617230e304ba029bf4f89da1adb7133df4651dfe90338aa9771b0a855b1d753", size = 58896, upload-time = "2026-06-17T00:40:21.281Z" },
 ]
 
 [[package]]
