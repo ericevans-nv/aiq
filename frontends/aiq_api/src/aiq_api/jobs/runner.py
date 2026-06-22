@@ -279,9 +279,9 @@ async def run_agent_job(
         data_sources: Optional list of allowed data sources to enforce in the worker.
         auth_token: Optional auth token propagated from the HTTP request for
             data sources that require authentication (requires_auth: true).
-        owner_user_id: Canonical per-user key (``principal_user_id``) for the job
-            owner. Set on the NAT Context so per_user_mcp_client retrieves the
-            token the owner connected via /v1/auth/mcp/{id}/connect.
+        owner_user_id: Canonical per-user key (``principal_user_id``), set on the NAT
+            Context so per_user_mcp_client retrieves the token the owner connected
+            via /v1/auth/mcp/{id}/connect.
     """
 
     # Propagate auth token into the current async task's context so tools
@@ -347,9 +347,9 @@ async def run_agent_job(
 
             provider, llm = await _create_llm_provider(builder, fn_config)
 
-            # Bind the job owner's identity on the NAT context before tools are
-            # built or run, so a per_user_mcp_client resolves the token this user
-            # connected via /v1/auth/mcp/{id}/connect (keyed by principal_user_id).
+            # Bind the job owner's identity on the NAT context before tools are built,
+            # so per_user_mcp_client resolves the token this user connected via
+            # /v1/auth/mcp/{id}/connect (keyed by principal_user_id).
             if owner_user_id:
                 from nat.builder.context import ContextState
 
@@ -477,9 +477,8 @@ async def run_agent_job(
                     callbacks.append(nat_profiler_callback)
 
                     # Resolve per-user MCP source tools for the job owner (Context.user_id
-                    # was set above). Their MCP client connections are kept open via
-                    # mcp_stack for the duration of the agent run. Best-effort: the helper
-                    # never raises for a source it can't resolve, so this can't break a job.
+                    # set above); connections stay open via mcp_stack for the agent run.
+                    # Best-effort: the helper never raises, so this can't break a job.
                     from contextlib import AsyncExitStack
 
                     from ..mcp_auth.runtime_tools import open_per_user_mcp_tools
