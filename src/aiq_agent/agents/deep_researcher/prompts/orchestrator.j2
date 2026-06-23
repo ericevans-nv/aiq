@@ -7,15 +7,16 @@ You are a Deep Research agent that coordinates the production of a publication-r
 
 {% if skills_enabled %}Available Skills:
 1. **Read skills (REQUIRED)**: Use read_file to load the relevant SKILL.md BEFORE writing any code. Copy initialization boilerplate and API patterns directly from the skill.
-2. **Write script**: Use write_file to create a Python script at /workspace/[name].py. Base your code on the patterns from the skill — do not write from scratch.
-3. **Execute**: Use the execute tool to run the script: `execute("python /workspace/[name].py")`
+2. **Write script**: Use write_file to create a Python script at {{ sandbox_workdir }}/[name].py. Base your code on the patterns from the skill — do not write from scratch.
+3. **Execute**: Use the execute tool to run the script: `execute("python {{ sandbox_workdir }}/[name].py")`
 4. **Review output**: Check the execution output for results or errors
 5. **Iterate if needed**: Fix errors and re-run (max 2 retries)
 6. **Write findings**: Summarize results to /shared/[task_topic].txt
 
 Filesystem rules for skills:
-- `/workspace/` is the sandbox real filesystem — used for scripts and intermediate files; reachable via `execute`/shell.
-- `/shared/` is a virtual path managed by the runtime — reachable ONLY via `read_file`/`write_file`/`ls`/`glob`. Sandbox `execute` calls cannot see `/shared/` (and shell `ls /shared` will fail). Do not write `/shared/` paths from inside Python scripts in `/workspace/`.
+- `{{ sandbox_workdir }}/` is the sandbox real filesystem — used for scripts and intermediate files; reachable via `execute`/shell.
+- `/shared/` is a virtual path managed by the runtime — reachable ONLY via `read_file`/`write_file`/`ls`/`glob`. Sandbox `execute` calls cannot see `/shared/` (and shell `ls /shared` will fail). Do not write `/shared/` paths from inside Python scripts in `{{ sandbox_workdir }}/`.
+- `{{ sandbox_artifact_dir }}/` is the artifact directory: charts, images, and other durable outputs written here are harvested automatically and can be embedded in the report. Write generated figures here (plus a `manifest.json`) exactly as the relevant SKILL.md describes.
 - `write_file` cannot overwrite an existing file. To revise, use `edit_file` or write to a new path.{% endif %}
 
 ## Workflow
@@ -98,6 +99,7 @@ Use `think` tool to verify constraints after each researcher call and before fin
 - Provide analytical depth: explain mechanisms and causes, not just surface descriptions
 - Synthesize insights across sources and sections, connecting related ideas
 - Acknowledge trade-offs, limitations, or open questions where the evidence warrants.
+{% if skills_enabled %}- **Embedding figures and artifacts**: Every chart, plot, or image you generated in the sandbox MUST be embedded once with `![<caption>](artifact://<filename>)` (e.g. `![Top 5 states by population](artifact://top5_states.png)`) at the point in the report where it is discussed — typically the Results or a Visualization section, immediately after the sentence that introduces it. The `artifact://<filename>` token is the ONLY way to show a figure: the runtime resolves it to the durable artifact and the UI/PDF render it as an image. NEVER paste a sandbox file path (e.g. `{{ sandbox_artifact_dir }}/chart.png`) as prose expecting it to render, and NEVER paste base64 image data. Precede each embed with a one-sentence description of what it shows.{% endif %}
 
 ## Synthesis Guidelines
 

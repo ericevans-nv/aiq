@@ -279,6 +279,7 @@ async def run_agent_job(
     job_store: JobStore | None = None
     cancellation_monitor: CancellationMonitor | None = None
     event_store: EventStore | BatchingEventStore | None = None
+    sandbox_runtime: Any | None = None
     logger.info(
         "Dask worker received: agent=%s, config=%s, job_id=%s",
         agent_class_path,
@@ -455,7 +456,8 @@ async def run_agent_job(
                     callbacks.append(AgentEventCallback(event_store))
                     callbacks.append(nat_profiler_callback)
 
-                    # Instantiate agent with callbacks
+                    # Instantiate agent with callbacks. Artifact capture (if enabled in
+                    # config) harvests to the shared db_url and emits SSE via the event store.
                     agent = _create_agent_instance(
                         agent_cls=agent_cls,
                         llm_provider=provider,
@@ -465,7 +467,12 @@ async def run_agent_job(
                         verbose=verbose,
                         callbacks=callbacks,
                         job_id=job_id,
+                        artifact_db_url=db_url,
+                        artifact_emit=event_store.store,
                     )
+                    # Hoist the sandbox runtime so the terminal `finally` can clean it
+                    # up (sandbox teardown) regardless of how the job ends.
+                    sandbox_runtime = getattr(agent, "deepagents_runtime", None)
 
                     # Run agent - LLM/tool events will be nested under workflow span
                     result = await _run_agent(
@@ -554,11 +561,24 @@ async def run_agent_job(
             event_store.flush()
 
     finally:
+        # Terminal ordering: final artifact harvest -> flush events -> cleanup sandbox.
+        # The harvest emits artifact SSE events, so it must run before the flush.
+        if sandbox_runtime is not None and hasattr(sandbox_runtime, "final_harvest"):
+            try:
+                await asyncio.to_thread(sandbox_runtime.final_harvest)
+            except Exception:
+                logger.warning("Final artifact harvest failed for job %s", job_id, exc_info=True)
         # Ensure terminal-path events are not left in the batch buffer.
         if event_store is not None and hasattr(event_store, "flush"):
             event_store.flush()
         if cancellation_monitor:
             cancellation_monitor.stop()
+        # Cleanup sandbox resources on every terminal path (success/failure/cancel/timeout).
+        if sandbox_runtime is not None and hasattr(sandbox_runtime, "close"):
+            try:
+                sandbox_runtime.close()
+            except Exception:
+                logger.warning("Sandbox cleanup failed for job %s", job_id, exc_info=True)
         # Clean up job-scoped auth token
         if _auth_token_reset is not None:
             from ._auth_context import job_auth_token
@@ -575,6 +595,8 @@ def _create_agent_instance(
     verbose: bool,
     callbacks: list,
     job_id: str | None = None,
+    artifact_db_url: str | None = None,
+    artifact_emit=None,
 ):
     """
     Create an agent instance, supporting different constructor patterns.
@@ -584,6 +606,23 @@ def _create_agent_instance(
     2. llm + tools pattern (simpler agents)
     """
     # Try async deep_researcher pattern with generic function config and job-scoped runtime state.
+    try:
+        return agent_cls(
+            llm_provider=llm_provider,
+            tools=tools,
+            max_loops=getattr(fn_config, "max_loops", 3),
+            verbose=verbose,
+            callbacks=callbacks,
+            config=fn_config,
+            job_id=job_id,
+            artifact_db_url=artifact_db_url,
+            artifact_emit=artifact_emit,
+        )
+    except TypeError as exc:
+        if "unexpected keyword argument" not in str(exc):
+            raise
+
+    # Agent accepts config/job_id but predates the artifact-capture params.
     try:
         return agent_cls(
             llm_provider=llm_provider,

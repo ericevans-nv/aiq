@@ -1353,7 +1353,7 @@ class TestAsyncJobRunnerAgentFactory:
         assert agent.config.skills.enabled is True
         assert agent.config.skills.sources == ("/skills/",)
         assert agent.config.sandbox is not None
-        assert agent.config.sandbox.app_name == "async-aiq"
+        assert agent.config.sandbox.providers.modal.app_name == "async-aiq"
 
     def test_async_deep_researcher_constructor_gets_rendered_skill_instructions(self):
         """Async job construction preserves skills/sandbox config through orchestrator prompt creation."""
@@ -1390,7 +1390,7 @@ class TestAsyncJobRunnerAgentFactory:
 
         with (
             patch(
-                "aiq_agent.agents.deep_researcher.deepagents_runtime._create_sandbox_backend",
+                "aiq_agent.agents.deep_researcher.deepagents_runtime.create_sandbox_backend",
                 return_value=MagicMock(),
             ),
             patch(

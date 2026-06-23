@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Sequence
@@ -27,6 +28,7 @@ from aiq_agent.common.citation_verification import EmptySourceRegistryError
 from aiq_agent.common.citation_verification import sanitize_report
 from aiq_agent.common.citation_verification import verify_citations
 
+from .custom_middleware import ArtifactHarvestMiddleware
 from .custom_middleware import EmptyContentFixMiddleware
 from .custom_middleware import SourceRegistryMiddleware
 from .custom_middleware import ToolNameSanitizationMiddleware
@@ -118,6 +120,8 @@ class DeepResearcherAgent:
         sandbox: SandboxConfig | None = None,
         config: Any | None = None,
         job_id: str | None = None,
+        artifact_db_url: str | None = None,
+        artifact_emit: Any | None = None,
     ) -> None:
         """
         Initialize the deep researcher subagent.
@@ -132,6 +136,8 @@ class DeepResearcherAgent:
             sandbox: Optional DeepAgents sandbox config.
             config: Optional agent config. Used by async workers to pass function config generically.
             job_id: Optional async job identifier used to scope sandbox backends.
+            artifact_db_url: Optional shared DB URL for the durable artifact store.
+            artifact_emit: Optional callable to emit artifact SSE events (e.g. event_store.store).
         """
         self.llm_provider = llm_provider
         self.tools = list(tools) if tools else []
@@ -144,7 +150,13 @@ class DeepResearcherAgent:
         if config is not None:
             skills = skills or getattr(config, "skills", None)
             sandbox = sandbox if sandbox is not None else getattr(config, "sandbox", None)
-        self.deepagents_runtime = DeepAgentsRuntime(skills=skills, sandbox=sandbox, job_id=job_id)
+        self.deepagents_runtime = DeepAgentsRuntime(
+            skills=skills,
+            sandbox=sandbox,
+            job_id=job_id,
+            artifact_db_url=artifact_db_url,
+            artifact_emit=artifact_emit,
+        )
 
         self._prompts = self._load_prompts()
         self.tools_info = []
@@ -186,6 +198,10 @@ class DeepResearcherAgent:
             ModelRetryMiddleware(max_retries=10, backoff_factor=2.0, initial_delay=1.0),
         ]
 
+        # Harvest durable artifacts after each execute when artifact capture is wired.
+        if self.deepagents_runtime.artifact_manager is not None:
+            self.middleware.insert(0, ArtifactHarvestMiddleware(self.deepagents_runtime.artifact_manager))
+
     def _load_prompts(self) -> dict[str, str]:
         """Load all prompts for subagents."""
         prompts = {}
@@ -220,6 +236,8 @@ class DeepResearcherAgent:
             "skill_sources": skill_sources or [],
             "sandbox_enabled": sandbox is not None,
             "sandbox_python_packages": tuple(sandbox.python_packages) if sandbox is not None else (),
+            "sandbox_workdir": self.deepagents_runtime.workdir,
+            "sandbox_artifact_dir": self.deepagents_runtime.artifact_dir,
         }
 
     def _get_subagents(self, state: DeepResearchAgentState) -> list[dict[str, Any]]:
@@ -505,9 +523,30 @@ class DeepResearcherAgent:
             if result and result.get("messages"):
                 final_message = self._extract_report_content(result["messages"])
 
+            # Harvest durable sandbox artifacts now (before report post-processing) so the
+            # report's artifact:// references resolve and artifact-producing tasks satisfy the
+            # source requirement. The job-end harvest in the runner is idempotent (content
+            # dedup), so this does not double-store.
+            # Sandbox harvest + store reads are synchronous (network + SQLite); run them in a
+            # worker thread so they never block the event loop (mirrors the runner's terminal
+            # harvest). The job-scoped artifact list is fetched once and reused below.
+            artifact_manager = self.deepagents_runtime.artifact_manager
+            produced_artifacts: list = []
+            if artifact_manager is not None:
+                try:
+                    await asyncio.to_thread(artifact_manager.final_harvest)
+                except Exception:  # noqa: BLE001 - harvest must never fail the report path
+                    logger.warning("Pre-report artifact harvest failed", exc_info=True)
+                try:
+                    produced_artifacts = await asyncio.to_thread(
+                        artifact_manager.store.list, artifact_manager.job_id
+                    )
+                except Exception:  # noqa: BLE001
+                    produced_artifacts = []
+
             # Post-process: verify citations against source registry
-            if self.source_registry_middleware._get_registry().all_sources():
-                registry = self.source_registry_middleware._get_registry()
+            registry = self.source_registry_middleware._get_registry()
+            if registry.all_sources():
                 verification = verify_citations(final_message, registry)
                 if verification.removed_citations:
                     removed_details = []
@@ -526,6 +565,15 @@ class DeepResearcherAgent:
                         "Deep researcher produced no valid citations after verification; "
                         "returning sanitized report without fabricating references."
                     )
+            elif produced_artifacts:
+                # Sandbox-produced artifacts (charts, CSVs, notebooks) are grounded outputs, so a
+                # compute/analysis task that captured artifacts is not failed for lacking external
+                # research citations. The artifact:// references are validated below.
+                logger.info(
+                    "No research sources captured, but %d sandbox artifact(s) were produced; "
+                    "accepting as grounded output.",
+                    len(produced_artifacts),
+                )
             else:
                 from aiq_agent.common.tool_validation import validate_tool_availability
 
@@ -543,6 +591,22 @@ class DeepResearcherAgent:
             # Post-process: sanitize report (strip body URLs, shortened URLs, unsafe URLs)
             sanitization = sanitize_report(final_message)
             final_message = sanitization.sanitized_report
+
+            # Post-process: validate artifact:// references against this job's harvested
+            # artifacts (rewrite filename refs to durable ids; drop unknown/foreign refs),
+            # then guarantee every produced inline figure surfaces even if the model forgot
+            # to embed it. Reuse the already-fetched artifact list (no extra store reads) and
+            # offload the pure-CPU rewrite via to_thread to keep the call site uniform.
+            if artifact_manager is not None:
+                final_message = await asyncio.to_thread(
+                    artifact_manager.resolve_report_references, final_message, produced_artifacts
+                )
+                final_message = await asyncio.to_thread(
+                    artifact_manager.ensure_inline_artifacts_embedded, final_message, produced_artifacts
+                )
+                final_message = await asyncio.to_thread(
+                    artifact_manager.append_artifact_index, final_message, produced_artifacts
+                )
 
             # Re-emit the verified/sanitized report so the frontend overwrites
             # the raw version that on_llm_end auto-emitted during ainvoke().
