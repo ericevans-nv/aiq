@@ -132,24 +132,25 @@ class DeepAgentsRuntime:
         artifact_emit: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.skills = skills or SkillsConfig()
-        self.sandbox = sandbox
+        # A disabled sandbox is treated as no sandbox (no provider, no sandbox prompts).
+        self.sandbox = sandbox if (sandbox is not None and sandbox.enabled) else None
         self.job_id = str(job_id) if job_id is not None else str(uuid4())
         self._backend: Any | None = None
         self._sandbox_provider: SandboxProvider | None = None
         self.artifact_manager: ArtifactManager | None = None
 
-        if sandbox is not None:
+        if self.sandbox is not None:
             # Fail-fast: construct the provider and verify its capabilities now
             # (import guard + capability gate). No SDK sandbox is created yet; the
             # actual session is built lazily on first execute.
-            self._sandbox_provider = create_sandbox_backend(sandbox, self.job_id)
-            if sandbox.artifact_capture.enabled and artifact_db_url:
+            self._sandbox_provider = create_sandbox_backend(self.sandbox, self.job_id)
+            if self.sandbox.artifact_capture.enabled and artifact_db_url:
                 self.artifact_manager = ArtifactManager(
                     job_id=self.job_id,
                     backend=self._sandbox_provider,
                     store=SqlArtifactStore(artifact_db_url),
-                    config=sandbox.artifact_capture,
-                    artifact_dir=sandbox.artifact_dir,
+                    config=self.sandbox.artifact_capture,
+                    artifact_dir=self.artifact_dir,
                     emit=artifact_emit,
                 )
 
@@ -175,8 +176,14 @@ class DeepAgentsRuntime:
 
     @property
     def artifact_dir(self) -> str:
-        """Effective sandbox artifact directory where generated outputs are harvested from."""
-        return self.sandbox.artifact_dir if self.sandbox is not None else f"{DEFAULT_WORKDIR}/aiq-artifacts"
+        """Effective sandbox artifact directory where generated outputs are harvested from.
+
+        Job-scoped (``<configured artifact_dir>/<job_id>``) so a persistent or shared
+        sandbox (e.g. the OpenShell demo container) cannot leak one job's files into
+        another job's harvest, and concurrent jobs never collide on the same directory.
+        """
+        base = self.sandbox.artifact_dir if self.sandbox is not None else f"{DEFAULT_WORKDIR}/aiq-artifacts"
+        return f"{base.rstrip('/')}/{self.job_id}"
 
     @property
     def create_agent_kwargs(self) -> dict[str, Any]:
