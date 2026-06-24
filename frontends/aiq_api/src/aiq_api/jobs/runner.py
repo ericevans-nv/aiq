@@ -574,37 +574,74 @@ async def run_agent_job(
             event_store.flush()
 
     finally:
-        # Terminal ordering: final artifact harvest -> flush events -> cleanup sandbox.
-        # The harvest emits artifact SSE events, so it must run before the flush.
-        if sandbox_runtime is not None and hasattr(sandbox_runtime, "final_harvest"):
-            try:
-                await asyncio.to_thread(sandbox_runtime.final_harvest)
-            except Exception:
-                logger.warning("Final artifact harvest failed for job %s", job_id, exc_info=True)
-        # Ensure terminal-path events are not left in the batch buffer.
-        if event_store is not None and hasattr(event_store, "flush"):
-            event_store.flush()
-        if cancellation_monitor:
-            cancellation_monitor.stop()
-        # Cleanup sandbox resources on every terminal path (success/failure/cancel/timeout).
-        # Interrupted jobs forcibly terminate() (stops a running execute); normal paths
-        # close() gracefully. Both are idempotent and must never raise on teardown.
-        if sandbox_runtime is not None:
-            teardown = None
-            if interrupted:
-                teardown = getattr(sandbox_runtime, "terminate", None)
-            if teardown is None:
-                teardown = getattr(sandbox_runtime, "close", None)
-            if teardown is not None:
-                try:
-                    teardown()
-                except Exception:
-                    logger.warning("Sandbox cleanup failed for job %s", job_id, exc_info=True)
+        # Ordered terminal teardown (harvest -> flush -> stop monitor -> sandbox cleanup),
+        # extracted to a helper so the ordering and interrupted->terminate routing are
+        # unit-testable without driving the whole worker.
+        await _finalize_terminal_path(
+            sandbox_runtime=sandbox_runtime,
+            event_store=event_store,
+            cancellation_monitor=cancellation_monitor,
+            job_id=job_id,
+            interrupted=interrupted,
+        )
         # Clean up job-scoped auth token
         if _auth_token_reset is not None:
             from ._auth_context import job_auth_token
 
             job_auth_token.reset(_auth_token_reset)
+
+
+async def _finalize_terminal_path(
+    *,
+    sandbox_runtime: Any | None,
+    event_store: EventStore | BatchingEventStore | None,
+    cancellation_monitor: CancellationMonitor | None,
+    job_id: str,
+    interrupted: bool,
+) -> None:
+    """Run the ordered terminal teardown for a job.
+
+    Order matters: the final artifact harvest emits artifact SSE events, so it must run
+    BEFORE the event flush; the sandbox is released last. Every step is best-effort and
+    must never raise on the teardown path.
+
+    Args:
+        sandbox_runtime: The job's ``DeepAgentsRuntime`` (or ``None`` when no sandbox).
+        event_store: Event store whose buffered events are flushed, if any.
+        cancellation_monitor: Background monitor to stop, if any.
+        job_id: Job identifier (for log context).
+        interrupted: True on cancel/timeout paths (forces ``terminate()`` over ``close()``).
+    """
+    if sandbox_runtime is not None and hasattr(sandbox_runtime, "final_harvest"):
+        try:
+            await asyncio.to_thread(sandbox_runtime.final_harvest)
+        except Exception:
+            logger.warning("Final artifact harvest failed for job %s", job_id, exc_info=True)
+    if event_store is not None and hasattr(event_store, "flush"):
+        event_store.flush()
+    if cancellation_monitor is not None:
+        cancellation_monitor.stop()
+    _teardown_sandbox(sandbox_runtime, job_id=job_id, interrupted=interrupted)
+
+
+def _teardown_sandbox(sandbox_runtime: Any | None, *, job_id: str, interrupted: bool) -> None:
+    """Release sandbox resources on a terminal path.
+
+    Interrupted jobs (cancel/timeout) call ``terminate()`` so a still-running ``execute``
+    is forcibly stopped; normal paths call ``close()`` gracefully. Both are idempotent and
+    must never raise on the teardown path.
+    """
+    if sandbox_runtime is None:
+        return
+    teardown = getattr(sandbox_runtime, "terminate", None) if interrupted else None
+    if teardown is None:
+        teardown = getattr(sandbox_runtime, "close", None)
+    if teardown is None:
+        return
+    try:
+        teardown()
+    except Exception:
+        logger.warning("Sandbox cleanup failed for job %s", job_id, exc_info=True)
 
 
 def _create_agent_instance(
