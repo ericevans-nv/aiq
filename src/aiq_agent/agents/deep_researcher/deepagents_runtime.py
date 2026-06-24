@@ -183,7 +183,11 @@ class DeepAgentsRuntime:
         another job's harvest, and concurrent jobs never collide on the same directory.
         """
         base = self.sandbox.artifact_dir if self.sandbox is not None else f"{DEFAULT_WORKDIR}/aiq-artifacts"
-        return f"{base.rstrip('/')}/{self.job_id}"
+        # job_id becomes a path segment, so keep only filename-safe characters: a crafted id
+        # containing "/" or ".." must not be able to move the harvest root outside the base
+        # (which the ArtifactManager then trusts as its confinement boundary).
+        safe_job = "".join(c if (c.isalnum() or c in "-_") else "_" for c in self.job_id) or "job"
+        return f"{base.rstrip('/')}/{safe_job}"
 
     @property
     def create_agent_kwargs(self) -> dict[str, Any]:
@@ -231,10 +235,20 @@ class DeepAgentsRuntime:
             logger.warning("Final artifact harvest failed for job %s", self.job_id, exc_info=True)
 
     def close(self) -> None:
-        """Release the sandbox provider on a terminal job path (idempotent)."""
+        """Release the sandbox provider on a normal terminal job path (idempotent)."""
         provider = self._sandbox_provider
         if provider is not None:
             provider.close()
+
+    def terminate(self) -> None:
+        """Forcibly stop the sandbox on an interrupted job (cancel/timeout), idempotent.
+
+        Unlike :meth:`close`, this interrupts a still-running ``execute`` instead of
+        waiting for it, so a cancelled job does not keep burning sandbox resources.
+        """
+        provider = self._sandbox_provider
+        if provider is not None:
+            provider.terminate()
 
 
 def _collect_builtin_skill_files() -> list[tuple[str, bytes]]:

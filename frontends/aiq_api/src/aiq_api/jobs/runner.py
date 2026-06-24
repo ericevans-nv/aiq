@@ -280,6 +280,9 @@ async def run_agent_job(
     cancellation_monitor: CancellationMonitor | None = None
     event_store: EventStore | BatchingEventStore | None = None
     sandbox_runtime: Any | None = None
+    # Interrupted jobs (cancel/timeout) tear the sandbox down with terminate() so a
+    # still-running execute is forcibly stopped; normal paths close() gracefully.
+    interrupted = False
     logger.info(
         "Dask worker received: agent=%s, config=%s, job_id=%s",
         agent_class_path,
@@ -529,6 +532,7 @@ async def run_agent_job(
 
     except asyncio.CancelledError:
         logger.info("Job %s cancelled", job_id)
+        interrupted = True
         if job_store:
             try:
                 job = await job_store.get_job(job_id)
@@ -583,11 +587,19 @@ async def run_agent_job(
         if cancellation_monitor:
             cancellation_monitor.stop()
         # Cleanup sandbox resources on every terminal path (success/failure/cancel/timeout).
-        if sandbox_runtime is not None and hasattr(sandbox_runtime, "close"):
-            try:
-                sandbox_runtime.close()
-            except Exception:
-                logger.warning("Sandbox cleanup failed for job %s", job_id, exc_info=True)
+        # Interrupted jobs forcibly terminate() (stops a running execute); normal paths
+        # close() gracefully. Both are idempotent and must never raise on teardown.
+        if sandbox_runtime is not None:
+            teardown = None
+            if interrupted:
+                teardown = getattr(sandbox_runtime, "terminate", None)
+            if teardown is None:
+                teardown = getattr(sandbox_runtime, "close", None)
+            if teardown is not None:
+                try:
+                    teardown()
+                except Exception:
+                    logger.warning("Sandbox cleanup failed for job %s", job_id, exc_info=True)
         # Clean up job-scoped auth token
         if _auth_token_reset is not None:
             from ._auth_context import job_auth_token

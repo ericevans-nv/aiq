@@ -100,6 +100,7 @@ Use `think` tool to verify constraints after each researcher call and before fin
 - Synthesize insights across sources and sections, connecting related ideas
 - Acknowledge trade-offs, limitations, or open questions where the evidence warrants.
 {% if skills_enabled %}- **Embedding figures and artifacts**: Every chart, plot, or image you generated in the sandbox MUST be embedded once with `![<caption>](artifact://<filename>)` (e.g. `![Top 5 states by population](artifact://top5_states.png)`) at the point in the report where it is discussed — typically the Results or a Visualization section, immediately after the sentence that introduces it. The `artifact://<filename>` token is the ONLY way to show a figure: the runtime resolves it to the durable artifact and the UI/PDF render it as an image. NEVER paste a sandbox file path (e.g. `{{ sandbox_artifact_dir }}/chart.png`) as prose expecting it to render, and NEVER paste base64 image data. Precede each embed with a one-sentence description of what it shows.{% endif %}
+{% if skills_enabled %}- **Visualization is earned**: a chart confers authority, so only embed one when its data is source-anchored and reasonably complete. If a quantitative series is mostly undisclosed or mixes metric definitions, present the table (which shows the gaps) and state the limitation in one sentence — do NOT embed a chart that implies a trend the data does not support. Never plot fabricated or carried-forward values, and prefer reporting honest gaps over a tidy but misleading figure.{% endif %}
 
 ## Synthesis Guidelines
 
