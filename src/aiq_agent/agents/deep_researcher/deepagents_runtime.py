@@ -44,6 +44,8 @@ from .sandbox import create_sandbox_backend
 from .sandbox.artifacts import ArtifactManager
 from .sandbox.artifacts import SqlArtifactStore
 from .sandbox.config import DEFAULT_WORKDIR
+from .sandbox.config import job_scoped_artifact_dir
+from .sandbox.config import job_scoped_workdir
 
 __all__ = ["SkillsConfig", "SandboxConfig", "DeepAgentsRuntime"]
 
@@ -171,23 +173,28 @@ class DeepAgentsRuntime:
 
     @property
     def workdir(self) -> str:
-        """Effective sandbox working directory, used to keep prompts/skills aligned."""
-        return self.sandbox.workdir if self.sandbox is not None else DEFAULT_WORKDIR
+        """Effective sandbox working directory, used to keep prompts/skills aligned.
+
+        Job-scoped (``<configured workdir>/<job_id>``) whenever a sandbox is active, so a
+        shared or long-lived sandbox (e.g. a reused OpenShell container) is safe to reuse
+        across jobs: each job's scripts and intermediate files live under their own root
+        and cannot collide with another job's leftovers.
+        """
+        if self.sandbox is None:
+            return DEFAULT_WORKDIR
+        return job_scoped_workdir(self.sandbox.workdir, self.job_id)
 
     @property
     def artifact_dir(self) -> str:
         """Effective sandbox artifact directory where generated outputs are harvested from.
 
-        Job-scoped (``<configured artifact_dir>/<job_id>``) so a persistent or shared
-        sandbox (e.g. the OpenShell demo container) cannot leak one job's files into
-        another job's harvest, and concurrent jobs never collide on the same directory.
+        Nested under the job-scoped :attr:`workdir` (``.../<job_id>/aiq-artifacts``) so a
+        persistent or shared sandbox cannot leak one job's files into another job's
+        harvest, and concurrent jobs never collide on the same directory.
         """
-        base = self.sandbox.artifact_dir if self.sandbox is not None else f"{DEFAULT_WORKDIR}/aiq-artifacts"
-        # job_id becomes a path segment, so keep only filename-safe characters: a crafted id
-        # containing "/" or ".." must not be able to move the harvest root outside the base
-        # (which the ArtifactManager then trusts as its confinement boundary).
-        safe_job = "".join(c if (c.isalnum() or c in "-_") else "_" for c in self.job_id) or "job"
-        return f"{base.rstrip('/')}/{safe_job}"
+        if self.sandbox is None:
+            return f"{DEFAULT_WORKDIR}/aiq-artifacts"
+        return job_scoped_artifact_dir(self.sandbox.workdir, self.job_id)
 
     @property
     def create_agent_kwargs(self) -> dict[str, Any]:

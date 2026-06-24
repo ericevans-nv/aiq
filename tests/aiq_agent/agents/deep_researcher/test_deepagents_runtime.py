@@ -39,6 +39,26 @@ from aiq_agent.agents.deep_researcher.deepagents_runtime import SHARED_ROUTE
 from aiq_agent.agents.deep_researcher.deepagents_runtime import DeepAgentsRuntime
 from aiq_agent.agents.deep_researcher.deepagents_runtime import SkillsConfig
 from aiq_agent.agents.deep_researcher.deepagents_runtime import _PrefixedStateBackend
+from aiq_agent.agents.deep_researcher.sandbox import SandboxCapabilities
+from aiq_agent.agents.deep_researcher.sandbox import SandboxConfig
+from aiq_agent.agents.deep_researcher.sandbox import SandboxProvider
+from aiq_agent.agents.deep_researcher.sandbox import register_sandbox_provider
+
+
+class _RuntimeFakeProvider(SandboxProvider):
+    """No-SDK provider so DeepAgentsRuntime can build a sandbox without a live gateway."""
+
+    provider_name = "runtime-fake"
+
+    @property
+    def capabilities(self) -> SandboxCapabilities:
+        return SandboxCapabilities()
+
+    def _create_session(self) -> Any:
+        raise AssertionError("no session should be created in these tests")
+
+
+register_sandbox_provider("runtime-fake", _RuntimeFakeProvider)
 
 
 def _attach_dict_state(backend: _PrefixedStateBackend, state: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -165,3 +185,19 @@ class TestDeepAgentsRuntimeJobId:
         # uuid4 strings are 36 chars, distinct between instances.
         assert len(runtime_a.job_id) == 36
         assert runtime_a.job_id != runtime_b.job_id
+
+
+class TestDeepAgentsRuntimeWorkspace:
+    """The effective workdir/artifact_dir are per-job so a reused sandbox stays isolated."""
+
+    def test_sandbox_paths_are_job_scoped(self) -> None:
+        cfg = SandboxConfig(provider="runtime-fake", block_network=False, workdir="/sandbox")
+        runtime = DeepAgentsRuntime(sandbox=cfg, job_id="job-xyz")
+        assert runtime.workdir == "/sandbox/job-xyz"
+        assert runtime.artifact_dir == "/sandbox/job-xyz/aiq-artifacts"
+
+    def test_no_sandbox_paths_unchanged(self) -> None:
+        # Without a sandbox there is no real FS to isolate; keep the legacy defaults.
+        runtime = DeepAgentsRuntime(job_id="job-xyz")
+        assert runtime.workdir == "/workspace"
+        assert runtime.artifact_dir == "/workspace/aiq-artifacts"

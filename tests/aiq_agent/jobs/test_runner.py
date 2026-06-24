@@ -1504,7 +1504,9 @@ class TestAsyncJobRunnerAgentFactory:
         assert kwargs["skills"] == ["/skills/"]
         assert "Available Skills:" in kwargs["system_prompt"]
         assert "Use read_file to load the relevant SKILL.md BEFORE writing any code" in kwargs["system_prompt"]
-        assert 'execute("python /workspace/[name].py")' in kwargs["system_prompt"]
+        job_id = agent.deepagents_runtime.job_id
+        workdir = agent.deepagents_runtime.workdir
+        assert f'execute("python {workdir}/{job_id}_[name].py")' in kwargs["system_prompt"]
         assert "Tell the planner to account for available skills" in kwargs["system_prompt"]
         assert "Include any applicable skill-use requirements from the plan" in kwargs["system_prompt"]
         assert "data-table-analysis" not in kwargs["system_prompt"]

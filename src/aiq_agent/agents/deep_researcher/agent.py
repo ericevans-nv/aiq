@@ -238,6 +238,7 @@ class DeepResearcherAgent:
             "sandbox_python_packages": tuple(sandbox.python_packages) if sandbox is not None else (),
             "sandbox_workdir": self.deepagents_runtime.workdir,
             "sandbox_artifact_dir": self.deepagents_runtime.artifact_dir,
+            "job_id": self.deepagents_runtime.job_id,
         }
 
     def _get_subagents(self, state: DeepResearchAgentState) -> list[dict[str, Any]]:
