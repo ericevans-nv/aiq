@@ -30,6 +30,7 @@ from uuid import uuid4
 from deepagents.backends import CompositeBackend
 from deepagents.backends import FilesystemBackend
 from deepagents.backends import StateBackend
+from deepagents.backends.state import create_file_data
 from deepagents.backends.protocol import ExecuteResponse
 from deepagents.backends.protocol import FileDownloadResponse
 from deepagents.backends.protocol import FileUploadResponse
@@ -148,6 +149,10 @@ class DeepAgentsRuntime:
             )
         return self._backend
 
+    def prepare_state_files(self, files: dict[str, Any]) -> dict[str, Any]:
+        """Normalize seeded virtual filesystem files for the configured backend."""
+        return _normalize_state_files(files, strip_shared_route=self._sandbox is not None)
+
 
 def _build_backend(
     *,
@@ -170,6 +175,33 @@ def _build_backend(
 def _skills_backend() -> FilesystemBackend:
     """Return the filesystem-backed built-in skills route."""
     return FilesystemBackend(root_dir=BUILTIN_SKILLS_DIR.resolve(), virtual_mode=True)
+
+
+def _normalize_state_files(files: dict[str, Any], *, strip_shared_route: bool) -> dict[str, Any]:
+    """Return files in the shape expected by DeepAgents StateBackend.
+
+    CompositeBackend strips a matched route before delegating to the route backend.
+    When /shared/ is backed by StateBackend, seeded files must therefore be stored
+    at the route-local path so reads for /shared/foo.md find /foo.md internally.
+    """
+    normalized: dict[str, Any] = {}
+    for file_path, file_data in files.items():
+        normalized_path = file_path
+        if strip_shared_route and file_path == SHARED_ROUTE.rstrip("/"):
+            normalized_path = "/"
+        elif strip_shared_route and file_path.startswith(SHARED_ROUTE):
+            normalized_path = f"/{file_path.removeprefix(SHARED_ROUTE)}"
+        normalized[normalized_path] = _normalize_file_data(file_data)
+    return normalized
+
+
+def _normalize_file_data(file_data: Any) -> Any:
+    """Return a DeepAgents file-data dict for raw seeded content."""
+    if isinstance(file_data, dict):
+        return file_data
+    if isinstance(file_data, bytes):
+        file_data = file_data.decode("utf-8")
+    return create_file_data(str(file_data))
 
 
 def discover_skill_collections(root: Path = BUILTIN_SKILLS_DIR) -> dict[str, str]:
